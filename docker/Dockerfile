@@ -36,61 +36,62 @@ WORKDIR /taiga-back
 ENV GOSU_VERSION 1.12
 
 RUN set -eux; \
-    savedAptMark="$(apt-mark showmanual)"; \
+    #### BASIC SETUP
     apt-get update; \
-    # install system dependencies
-    apt-get install -y \
-       build-essential \
-       gettext \
-       git \
-       net-tools \
-       procps \
-       wget; \
-    # install gosu
-    apt-get install -y --no-install-recommends ca-certificates wget; \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        gettext \
+        git \
+        net-tools \
+        procps \
+        libpq-dev \
+        wget; \
+    ### GOSU SETUP: https://github.com/tianon/gosu/blob/master/INSTALL.md
+    savedAptMark="$(apt-mark showmanual)"; \
+    apt-get install -y --no-install-recommends gnupg ca-certificates wget; \
     dpkgArch="$(dpkg --print-architecture | awk -F- '{ print $NF }')"; \
     wget -O /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch"; \
-	wget -O /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch.asc"; \
+    wget -O /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch.asc"; \
     chmod +x /usr/local/bin/gosu; \
-    # verify gosu signature
+    ### GOSU SIGNATURE VERIFICATION
     export GNUPGHOME="$(mktemp -d)"; \
-	gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4; \
-	gpg --batch --verify /usr/local/bin/gosu.asc /usr/local/bin/gosu; \
-	command -v gpgconf && gpgconf --kill all || :; \
-	rm -rf "$GNUPGHOME" /usr/local/bin/gosu.asc; \
-    # install Taiga dependencies
+    gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4; \
+    gpg --batch --verify /usr/local/bin/gosu.asc /usr/local/bin/gosu; \
+    command -v gpgconf && gpgconf --kill all || :; \
+    rm -rf "$GNUPGHOME" /usr/local/bin/gosu.asc; \
+    ### GOSU CLEANUP
+    apt-mark auto '.*' > /dev/null; \
+    [ -z "$savedAptMark" ] || apt-mark manual $savedAptMark; \
+    apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
+    ### TAIGA SETUP
     python -m pip install --upgrade pip; \
     python -m pip install wheel; \
     python -m pip install -r requirements.txt; \
     python -m pip install -r requirements-contribs.txt; \
     python manage.py compilemessages; \
-    python manage.py collectstatic --no-input; \
+    python manage.py collectstatic --noinput; \
     chmod +x docker/entrypoint.sh; \
     chmod +x docker/async_entrypoint.sh; \
     cp docker/config.py settings/config.py; \
-    #  create taiga group and user to use it and give permissions over the code (in entrypoint)
+    ### TAIGA create unprivileged group and user to use it and give permissions over the code (in entrypoint)
     groupadd --system taiga --gid=999; \
     useradd --system --no-create-home --gid taiga --uid=999 --shell=/bin/bash taiga; \
     mkdir -p /taiga-back/media/exports; \
     chown -R taiga:taiga /taiga-back; \
-    # remove unneeded files and packages
-    apt-get purge -y \
-       build-essential \
-       gettext \
-       git; \
-    apt-get autoremove -y; \
-    rm -rf /var/lib/apt/lists/*; \
-    rm -rf /root/.cache; \
-    # clean gosu
-    apt-mark auto '.*' > /dev/null; \
-    [ -z "$savedAptMark" ] || apt-mark manual $savedAptMark; \
-	apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
-    # clean taiga
+    ### TAIGA CLEANUP
     rm requirements.txt; \
     rm requirements-contribs.txt; \
     find . -name '__pycache__' -exec rm -r '{}' +; \
     find . -name '*pyc' -exec rm -r '{}' +; \
-    find . -name '*po' -exec rm -r '{}' +
+    find . -name '*po' -exec rm -r '{}' +; \
+    ### BASIC CLEANUP
+    apt-get purge -y \
+        build-essential \
+        gettext \
+        git; \
+    apt-get autoremove -y; \
+    rm -rf /var/lib/apt/lists/*; \
+    rm -rf /root/.cache
 
 ENV DJANGO_SETTINGS_MODULE=settings.config
 

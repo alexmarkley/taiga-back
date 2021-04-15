@@ -25,6 +25,10 @@ python manage.py migrate
 echo Load default templates
 python manage.py loaddata initial_project_templates
 
+# Assume the static files volume is empty upon first startup.
+echo Collecting static files
+python manage.py collectstatic --noinput
+
 # Give permission to taiga:taiga after mounting volumes
 echo Give permission to taiga:taiga
 chown -R taiga:taiga /taiga-back

@@ -69,7 +69,6 @@ RUN set -eux; \
     python -m pip install -r requirements.txt; \
     python -m pip install -r requirements-contribs.txt; \
     python manage.py compilemessages; \
-    python manage.py collectstatic --noinput; \
     chmod +x docker/entrypoint.sh; \
     chmod +x docker/async_entrypoint.sh; \
     cp docker/config.py settings/config.py; \
